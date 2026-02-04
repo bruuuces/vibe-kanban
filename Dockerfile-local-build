@@ -1,0 +1,31 @@
+FROM node:20-bullseye AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    clang \
+    curl \
+    git \
+    libssl-dev \
+    llvm \
+    pkg-config \
+    zip \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+WORKDIR /app
+
+COPY package*.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY frontend/package*.json ./frontend/
+COPY npx-cli/package*.json ./npx-cli/
+
+RUN corepack enable && corepack prepare pnpm@10.13.1 --activate
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
+RUN bash ./local-build.sh
