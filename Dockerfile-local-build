@@ -23,7 +23,6 @@ COPY npx-cli/package*.json ./npx-cli/
 
 RUN corepack enable && corepack prepare pnpm@10.13.1 --activate
 RUN --mount=type=bind,from=cache,target=/cache,rw \
-  set -euo pipefail; \
   mkdir -p /cache/pnpm-store; \
   PNPM_STORE_PATH=/cache/pnpm-store pnpm install --frozen-lockfile
 
@@ -31,7 +30,6 @@ COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY crates/*/Cargo.toml ./crates/*/Cargo.toml
 
 RUN --mount=type=bind,from=cache,target=/cache,rw \
-  set -euo pipefail; \
   mkdir -p /cache/cargo /cache/target; \
   CARGO_HOME=/cache/cargo cargo fetch --locked
 
@@ -40,7 +38,6 @@ COPY crates ./crates
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 
 RUN --mount=type=bind,from=cache,target=/cache,rw \
-  set -euo pipefail; \
   mkdir -p /cache/cargo /cache/target; \
   CARGO_HOME=/cache/cargo CARGO_TARGET_DIR=/cache/target \
   cargo build --release --manifest-path Cargo.toml; \
@@ -51,7 +48,6 @@ COPY shared ./shared
 COPY frontend ./frontend
 
 RUN --mount=type=bind,from=cache,target=/cache,rw \
-  set -euo pipefail; \
   mkdir -p /cache/pnpm-store; \
   (cd frontend && PNPM_STORE_PATH=/cache/pnpm-store npm run build)
 
