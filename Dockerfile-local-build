@@ -22,10 +22,67 @@ COPY frontend/package*.json ./frontend/
 COPY npx-cli/package*.json ./npx-cli/
 
 RUN corepack enable && corepack prepare pnpm@10.13.1 --activate
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=bind,from=cache,target=/cache,rw \
+  set -euo pipefail; \
+  mkdir -p /cache/pnpm-store; \
+  PNPM_STORE_PATH=/cache/pnpm-store pnpm install --frozen-lockfile
 
-COPY . .
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY crates/*/Cargo.toml ./crates/*/Cargo.toml
+
+RUN --mount=type=bind,from=cache,target=/cache,rw \
+  set -euo pipefail; \
+  mkdir -p /cache/cargo /cache/target; \
+  CARGO_HOME=/cache/cargo cargo fetch --locked
+
+COPY crates ./crates
 
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 
-RUN bash ./local-build.sh
+RUN --mount=type=bind,from=cache,target=/cache,rw \
+  set -euo pipefail; \
+  mkdir -p /cache/cargo /cache/target; \
+  CARGO_HOME=/cache/cargo CARGO_TARGET_DIR=/cache/target \
+  cargo build --release --manifest-path Cargo.toml; \
+  CARGO_HOME=/cache/cargo CARGO_TARGET_DIR=/cache/target \
+  cargo build --release --bin mcp_task_server --manifest-path Cargo.toml
+
+COPY shared ./shared
+COPY frontend ./frontend
+
+RUN --mount=type=bind,from=cache,target=/cache,rw \
+  set -euo pipefail; \
+  mkdir -p /cache/pnpm-store; \
+  (cd frontend && PNPM_STORE_PATH=/cache/pnpm-store npm run build)
+
+COPY npx-cli ./npx-cli
+
+ARG TARGETOS=linux
+ARG TARGETARCH
+
+RUN set -euo pipefail; \
+    case "${TARGETARCH:-}" in \
+      amd64) ARCH="x64" ;; \
+      arm64) ARCH="arm64" ;; \
+      *) ARCH="${TARGETARCH:-unknown}" ;; \
+    esac; \
+    case "${TARGETOS:-}" in \
+      linux) OS="linux" ;; \
+      *) OS="${TARGETOS:-unknown}" ;; \
+    esac; \
+    PLATFORM="${OS}-${ARCH}"; \
+    echo "Detected platform: ${PLATFORM}"; \
+    rm -rf npx-cli/dist; \
+    mkdir -p "npx-cli/dist/${PLATFORM}"; \
+    cp "/cache/target/release/server" vibe-kanban; \
+    zip -q vibe-kanban.zip vibe-kanban; \
+    rm -f vibe-kanban; \
+    mv vibe-kanban.zip "npx-cli/dist/${PLATFORM}/vibe-kanban.zip"; \
+    cp "/cache/target/release/mcp_task_server" vibe-kanban-mcp; \
+    zip -q vibe-kanban-mcp.zip vibe-kanban-mcp; \
+    rm -f vibe-kanban-mcp; \
+    mv vibe-kanban-mcp.zip "npx-cli/dist/${PLATFORM}/vibe-kanban-mcp.zip"; \
+    cp "/cache/target/release/review" vibe-kanban-review; \
+    zip -q vibe-kanban-review.zip vibe-kanban-review; \
+    rm -f vibe-kanban-review; \
+    mv vibe-kanban-review.zip "npx-cli/dist/${PLATFORM}/vibe-kanban-review.zip"

@@ -5,8 +5,15 @@ set -euo pipefail
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 IMAGE_NAME="vibe-kanban-local-build"
 OUT_DIR="${ROOT_DIR}/dist"
+CACHE_DIR="${ROOT_DIR}/cache"
 
-docker build -f "${ROOT_DIR}/Dockerfile-local-build" -t "${IMAGE_NAME}" "${ROOT_DIR}"
+mkdir -p "${CACHE_DIR}"
+
+docker buildx build --load \
+  -f "${ROOT_DIR}/Dockerfile-local-build" \
+  -t "${IMAGE_NAME}" \
+  --build-context cache="${CACHE_DIR}" \
+  "${ROOT_DIR}"
 
 container_id=$(docker create "${IMAGE_NAME}")
 cleanup() {
