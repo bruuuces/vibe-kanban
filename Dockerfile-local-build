@@ -27,18 +27,13 @@ RUN --mount=type=bind,from=cache,target=/cache,rw \
   PNPM_STORE_PATH=/cache/pnpm-store pnpm install --frozen-lockfile
 
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
-COPY crates/*/Cargo.toml ./crates/*/Cargo.toml
-
-RUN --mount=type=bind,from=cache,target=/cache,rw \
-  mkdir -p /cache/cargo /cache/target; \
-  CARGO_HOME=/cache/cargo cargo fetch --locked
-
 COPY crates ./crates
 
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 
 RUN --mount=type=bind,from=cache,target=/cache,rw \
   mkdir -p /cache/cargo /cache/target; \
+  CARGO_HOME=/cache/cargo cargo fetch --locked; \
   CARGO_HOME=/cache/cargo CARGO_TARGET_DIR=/cache/target \
   cargo build --release --manifest-path Cargo.toml; \
   CARGO_HOME=/cache/cargo CARGO_TARGET_DIR=/cache/target \
